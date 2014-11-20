@@ -21,6 +21,10 @@ public class ImageUtils {
         final int width = (int) Math.round(image.getWidth() * factor);
         final int height = (int) Math.round(image.getHeight() * factor);
 
+        if (width < 1 || height < 1) {
+            throw new RuntimeException("not possible smaller");
+        }
+
         final BufferedImage resizedImage = new BufferedImage(width, height, type);
         final Graphics2D g = resizedImage.createGraphics();
         g.drawImage(image, 0, 0, width, height, null);

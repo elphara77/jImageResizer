@@ -48,7 +48,7 @@ public class JImageResizer {
     private static final int MIN_VALUE = -2000;
     private static final int MAX_VALUE = 2000;
     private static final int TICK = 1000;
-    private static final int INIT_VALUE = -1000;
+    private static final int INIT_VALUE = getSlideValue(Context.getInstance().getFactor());
 
     private static String oldField = getText(INIT_VALUE);
     private static Boolean permitChange = Boolean.TRUE;
@@ -72,6 +72,9 @@ public class JImageResizer {
             Image grayImage = GrayFilter.createDisabledImage(image);
             {
                 setOpaque(false);
+                setEditable(false);
+                setLineWrap(true);
+                setToolTipText("drag images here");
             }
 
             public void paint(Graphics g) {
@@ -85,17 +88,20 @@ public class JImageResizer {
             public void filesDropped(final File[] files) {
                 for (final File file : files) {
                     try {
-                        text.append("treating file : " + file.getCanonicalPath() + "\n");
+                        text.setText("");
+                        text.append("treating : " + file.getName() + "\n");
                         final File destination = FilenameUtils.getDestination(file);
                         final BufferedImage original = ImageUtils.getImage(file);
+                        text.append(">>> " + destination.getName() + "\n");
                         final BufferedImage resized = ImageUtils.resize(original, Context.getInstance().getFactor(), Context.getInstance().isHint());
                         ImageUtils.write(resized, destination);
-                        text.append("OK : " + destination.getCanonicalPath() + "\n");
-                        if (text.getText().length() > 1000) {
-                            text.setText("");
+                        text.append("Ok Done :-)\n");
+                    } catch (Exception e) {
+                        String message = e.getMessage();
+                        if (message == null || "".equals(message)) {
+                            message = "Not Possible : an error occurs";
                         }
-                    } catch (IOException e) {
-                        text.append(e.getMessage() + "\n");
+                        text.append(message + " :-( !\n");
                         e.printStackTrace();
                     }
                 }
@@ -137,6 +143,7 @@ public class JImageResizer {
                     setPermitChange(false);
                     int v = slider.getValue();
                     slider.setValue(-v);
+                    getText(-v);
                 } else {
                     setPermitChange(true);
                 }
@@ -202,13 +209,14 @@ public class JImageResizer {
     }
 
     protected static int getSlideValue(double value) {
-        int n = (int) Math.round(Math.log10(Math.abs(value)) * Math.abs(INIT_VALUE) * Math.signum(value));
+        int n = (int) Math.round(Math.log10(Math.abs(value)) * TICK * Math.signum(value));
         return n;
     }
 
     protected static String getText(int value) {
-        double v = ((double) value) / Math.abs(INIT_VALUE);
+        double v = ((double) value) / TICK;
         double scale = Math.pow(10, v);
+        Context.getInstance().setFactor(scale);
         if (scale == 1.0) {
             return "no change !";
         } else {
