@@ -176,6 +176,7 @@ public class JImageResizer {
 
         frame.setBounds(100, 100, 300, 400);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setResizable(false);
         frame.setVisible(true);
     }
 
