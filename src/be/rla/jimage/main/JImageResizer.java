@@ -1,16 +1,22 @@
 package be.rla.jimage.main;
 
 import java.awt.BorderLayout;
+import java.awt.Graphics;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Image;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 
+import javax.swing.GrayFilter;
+import javax.swing.ImageIcon;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -27,16 +33,24 @@ import javax.swing.event.ChangeListener;
 import net.iharder.dnd.FileDrop;
 
 public class JImageResizer {
-    
-    //TODO reset button : gui
-    //TODO cste tick : code
-    //TODO variable sensibility tick + gui (pref?)
-    //TODO variable max/min + gui (pref?)
-    //TODO field handler auto adjust
-    //TODO progressbar 
-    //TODO keep simple <--> pref/options ?
-    //TODO multi thread 
 
+    // TODO keep simple <--> pref/options ?
+    // TODO progressbar
+    // TODO multi thread
+    // TODO drop directory
+    // TODO reset button : gui
+    // TODO variable max/min + gui (pref?)
+    // TODO field handler auto adjust
+    // TODO variable sensibility tick + gui (pref?)
+
+    private static final String version = "1.0";
+
+    private static final int MIN_VALUE = -2000;
+    private static final int MAX_VALUE = 2000;
+    private static final int TICK = 1000;
+    private static final int INIT_VALUE = -1000;
+
+    private static String oldField = getText(INIT_VALUE);
     private static Boolean permitChange = Boolean.TRUE;
 
     public static void main(String[] args) {
@@ -47,9 +61,24 @@ public class JImageResizer {
             e.printStackTrace();
         }
 
-        JFrame frame = new JFrame("jImageResizer");
+        JFrame frame = new JFrame("jImageResizer v" + version);
 
-        final JTextArea text = new JTextArea();
+        final ImageIcon imageIcon = new ImageIcon(JImageResizer.class.getClassLoader().getResource("dropzone.jpg"));
+        JTextArea text = new JTextArea() {
+            private static final long serialVersionUID = 1L;
+
+            Image image = imageIcon.getImage();
+
+            Image grayImage = GrayFilter.createDisabledImage(image);
+            {
+                setOpaque(false);
+            }
+
+            public void paint(Graphics g) {
+                g.drawImage(grayImage, 25, 100, this);
+                super.paint(g);
+            }
+        };
         frame.getContentPane().add(new JScrollPane(text), BorderLayout.CENTER);
 
         new FileDrop(System.out, text, new FileDrop.Listener() {
@@ -73,20 +102,21 @@ public class JImageResizer {
             }
         });
 
-        JTextField field = new JTextField(getText(-100));
+        JTextField field = new JTextField(getText(INIT_VALUE));
         field.setHorizontalAlignment(JTextField.CENTER);
 
         JComboBox<String> combo = new JComboBox<>(new String[]{"smaller", "larger"});
 
-        JSlider slider = new JSlider(SwingConstants.HORIZONTAL, -200, 200, -100);
-        slider.setMinorTickSpacing(10);
+        JSlider slider = new JSlider(SwingConstants.HORIZONTAL, MIN_VALUE, MAX_VALUE, INIT_VALUE);
+        slider.setMinorTickSpacing(TICK);
         slider.addChangeListener(new ChangeListener() {
 
             @Override
             public void stateChanged(ChangeEvent e) {
                 if (getPermitChange()) {
-                    int value = slider.getValue();
-                    field.setText(getText(value));
+                    final int value = slider.getValue();
+                    final String text = getText(value);
+                    field.setText(text);
                     if (value < 0) {
                         if (!"smaller".equals(combo.getSelectedItem())) {
                             combo.setSelectedItem("smaller");
@@ -112,13 +142,18 @@ public class JImageResizer {
                 }
             }
         });
-        
+
         field.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                //TODO implements handler with permitchange
-                //FIXME
-                System.out.println(e);
+                fieldListImpl(field, combo, slider);
+            }
+        });
+        field.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent e) {
+                super.focusLost(e);
+                fieldListImpl(field, combo, slider);
             }
         });
 
@@ -144,8 +179,34 @@ public class JImageResizer {
         frame.setVisible(true);
     }
 
+    protected static void fieldListImpl(JTextField field, JComboBox<String> combo, JSlider slider) {
+        final String rawText = field.getText();
+        final String regex_double = "\\s*\\d*[\\.\\,]?\\d+\\s*[xX]?\\s*";
+        if (rawText.matches(regex_double)) {
+            String text = rawText.replace("X", "").replace("x", "").replace(" ", "").replace(",", ".");
+            try {
+                final double d = Double.parseDouble(text) * ("smaller".equals(combo.getSelectedItem()) ? -1 : 1);
+                final int slideValue = getSlideValue(d);
+                if (slideValue >= MIN_VALUE && slideValue <= MAX_VALUE) {
+                    slider.setValue(slideValue);
+                    final String t = getText(slideValue);
+                    oldField = t;
+                }
+            } catch (Exception ex) {
+            }
+        }
+        if (!rawText.equals(oldField)) {
+            field.setText(oldField);
+        }
+    }
+
+    protected static int getSlideValue(double value) {
+        int n = (int) Math.round(Math.log10(Math.abs(value)) * Math.abs(INIT_VALUE) * Math.signum(value));
+        return n;
+    }
+
     protected static String getText(int value) {
-        double v = value / 100.0;
+        double v = ((double) value) / Math.abs(INIT_VALUE);
         double scale = Math.pow(10, v);
         if (scale == 1.0) {
             return "no change !";
